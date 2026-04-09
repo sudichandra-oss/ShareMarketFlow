@@ -6,7 +6,7 @@ Runs all 4 agents in sequence after market close.
 import json
 import logging
 import os
-from datetime import date
+from datetime import datetime, date
 from crewai import Crew, Process
 
 from agents.collector import create_collector_agent, create_collection_task
@@ -14,6 +14,7 @@ from agents.cleaner import create_cleaner_agent, create_cleaning_task, clean_dea
 from agents.analyzer import create_analyzer_agent, create_analysis_task
 from agents.insights import create_insight_agent, create_insight_task, generate_mock_insight
 from agents.alert import create_alert_agent, create_alert_task, check_flow_alerts, check_deal_alerts
+from database import save_deals, save_insights, save_alerts, save_fii_dii_analysis, save_pipeline_run
 
 logger = logging.getLogger(__name__)
 
@@ -21,16 +22,32 @@ logger = logging.getLogger(__name__)
 def run_pipeline() -> dict:
     """
     Main pipeline entry point. 
-    Runs all agents sequentially and returns final result.
+    Runs all agents sequentially, saves results to DB, and returns final result.
     """
     logger.info("🚀 Starting ShareMarketFlow agent pipeline...")
+    start_time = datetime.now().isoformat()
 
     use_llm = bool(os.getenv("OPENAI_API_KEY", "").strip() and not os.getenv("OPENAI_API_KEY", "").startswith("your_"))
 
     if use_llm:
-        return _run_with_crewai()
+        result = _run_with_crewai()
     else:
-        return _run_mock_pipeline()
+        result = _run_mock_pipeline()
+    
+    end_time = datetime.now().isoformat()
+    
+    # Save pipeline run metadata
+    save_pipeline_run(
+        start_time=start_time,
+        end_time=end_time,
+        status=result.get("status", "unknown"),
+        deals_processed=result.get("deals_processed", 0),
+        alerts_generated=result.get("alerts_generated", 0),
+        insights_generated=1 if result.get("insight") else 0,
+        message=f"Pipeline result: {result.get('status')}"
+    )
+    
+    return result
 
 
 def _run_mock_pipeline() -> dict:
@@ -41,17 +58,26 @@ def _run_mock_pipeline() -> dict:
     logger.info("Running mock pipeline (no LLM configured)")
 
     # Step 1: Collect
+    today_str = str(date.today())
     mock_deals = [
-        {"mTradDt": str(date.today()), "scrpNm": "HDFCBANK", "clntNm": "GIC PRIVATE LIMITED", "BuySell": "BUY", "bd_qty": 14200000, "bd_trdVal": 261635000000},
-        {"mTradDt": str(date.today()), "scrpNm": "RELIANCE", "clntNm": "BLACKROCK INC", "BuySell": "BUY", "bd_qty": 3800000, "bd_trdVal": 111758000000},
-        {"mTradDt": str(date.today()), "scrpNm": "TCS", "clntNm": "VANGUARD GROUP", "BuySell": "SELL", "bd_qty": 2100000, "bd_trdVal": 86688000000},
+        {"mTradDt": today_str, "scrpNm": "HDFCBANK", "clntNm": "GIC PRIVATE LIMITED", "BuySell": "BUY", "bd_qty": 14200000, "bd_trdVal": 261635000000},
+        {"mTradDt": today_str, "scrpNm": "RELIANCE", "clntNm": "BLACKROCK INC", "BuySell": "BUY", "bd_qty": 3800000, "bd_trdVal": 111758000000},
+        {"mTradDt": today_str, "scrpNm": "TCS", "clntNm": "VANGUARD GROUP", "BuySell": "SELL", "bd_qty": 2100000, "bd_trdVal": 86688000000},
     ]
 
     # Step 2: Clean
     clean_deals = [clean_deal(d) for d in mock_deals]
+    save_deals(clean_deals)
 
     # Step 3: Analyze
     analysis = {
+        "date": today_str,
+        "total_fii_inflow": 3733,  # 2616 + 1117
+        "total_dii_inflow": 1979,  # 1024 + 955
+        "net_flow": 1754,
+        "fii_sentiment": "BULLISH",
+        "dii_sentiment": "BULLISH",
+        "analysis": "Institutional activity remains strong in banking and energy sectors. FIIs are net buyers.",
         "top_fii_buyers": [{"name": "GIC Private Limited", "value_cr": 2616}, {"name": "BlackRock Inc.", "value_cr": 1117}],
         "top_dii_buyers": [{"name": "SBI Mutual Fund", "value_cr": 1024}, {"name": "LIC", "value_cr": 955}],
         "smart_money_score": 74,
@@ -60,18 +86,21 @@ def _run_mock_pipeline() -> dict:
         "fii_5d_sum": 2847,
         "dii_5d_sum": 3870,
     }
+    save_fii_dii_analysis(analysis)
 
     # Step 4: Insights
     insight = generate_mock_insight(analysis)
+    save_insights([insight])
 
     # Step 5: Alerts
     deal_alerts = check_deal_alerts(clean_deals)
     flow_alerts = check_flow_alerts(analysis)
     all_alerts = deal_alerts + flow_alerts
+    save_alerts(all_alerts)
 
     result = {
         "status": "success",
-        "pipeline_date": str(date.today()),
+        "pipeline_date": today_str,
         "deals_processed": len(clean_deals),
         "alerts_generated": len(all_alerts),
         "insight": insight,
@@ -107,6 +136,11 @@ def _run_with_crewai() -> dict:
         )
 
         result = crew.kickoff()
+        
+        # NOTE: In a real CrewAI setup, you'd parse the output 
+        # for structured data to call save_* functions. 
+        # For now, we return the Crew output.
+        
         return {
             "status": "success",
             "pipeline_date": str(date.today()),
@@ -116,3 +150,4 @@ def _run_with_crewai() -> dict:
     except Exception as e:
         logger.error(f"CrewAI pipeline failed: {e}, falling back to mock")
         return _run_mock_pipeline()
+

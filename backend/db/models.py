@@ -2,9 +2,8 @@
 
 from sqlalchemy import (
     Column, Integer, String, Numeric, BigInteger,
-    Boolean, Text, Date, ARRAY, DateTime
+    Boolean, Text, Date, ARRAY, DateTime, JSON
 )
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.sql import func
 from db.database import Base
 
@@ -63,8 +62,8 @@ class Insight(Base):
     title = Column(String(500))
     summary = Column(Text)
     full_report = Column(Text)
-    key_points = Column(JSONB)
-    sectors_mentioned = Column(ARRAY(Text))
+    key_points = Column(JSON)  # Changed from JSONB for SQLite compatibility
+    sectors_mentioned = Column(JSON)  # Changed from ARRAY(Text) for SQLite compatibility
     smart_money_score = Column(Integer)
     sector_momentum = Column(Integer)
     institutional_confidence = Column(Integer)
@@ -75,12 +74,59 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, index=True)
     alert_type = Column(String(50))
     institution_name = Column(String(200))
     company_name = Column(String(200))
     sector = Column(String(100))
     value_cr = Column(Numeric(15, 2))
+    title = Column(String(500))
     description = Column(Text)
     severity = Column(String(10))  # HIGH / MEDIUM / LOW
+    is_active = Column(Boolean, default=True)
     is_read = Column(Boolean, default=False)
     triggered_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class MarketIndex(Base):
+    __tablename__ = "market_indices"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    nifty50_value = Column(Numeric(12, 2))
+    nifty50_change = Column(Numeric(10, 2))
+    nifty50_change_pct = Column(Numeric(5, 2))
+    sensex_value = Column(Numeric(12, 2))
+    sensex_change = Column(Numeric(10, 2))
+    sensex_change_pct = Column(Numeric(5, 2))
+    nse_change_pct = Column(Numeric(5, 2))
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class FiiDiiAnalysis(Base):
+    __tablename__ = "fii_dii_analysis"
+
+    id = Column(Integer, primary_key=True, index=True)
+    date = Column(Date, unique=True, index=True)
+    total_fii_inflow = Column(Numeric(15, 2))
+    total_dii_inflow = Column(Numeric(15, 2))
+    net_flow = Column(Numeric(15, 2))
+    fii_sentiment = Column(String(20))
+    dii_sentiment = Column(String(20))
+    analysis = Column(Text)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class PipelineRun(Base):
+    __tablename__ = "pipeline_runs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    start_time = Column(DateTime(timezone=True))
+    end_time = Column(DateTime(timezone=True))
+    status = Column(String(20))
+    message = Column(Text)
+    deals_processed = Column(Integer)
+    alerts_generated = Column(Integer)
+    insights_generated = Column(Integer)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
