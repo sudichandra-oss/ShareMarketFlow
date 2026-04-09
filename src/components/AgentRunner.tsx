@@ -27,44 +27,55 @@ export default function AgentRunner({ onSuccess }: AgentRunnerProps) {
     return unsubscribe;
   }, []);
 
-  // Simulate agent execution
+  // Call the backend and poll status
   useEffect(() => {
     if (status !== 'running') return;
 
-    const steps = [
-      '📝 Initializing pipeline...',
-      '⏳ Fetching latest market data...',
-      '📊 Analyzing FII/DII institutional flows...',
-      '📈 Processing sector performance...',
-      '🤖 Running advanced AI analysis...',
-      '💡 Generating insights...',
-      '🔔 Creating alerts...',
-    ];
+    let timer: NodeJS.Timeout;
 
-    let stepIndex = Math.max(0, progress.length - 2); // Account for init message
-
-    const timer = setInterval(() => {
-      if (stepIndex < steps.length) {
-        addProgress(steps[stepIndex]);
-        stepIndex++;
-      } else {
-        // All steps complete
-        clearInterval(timer);
-        completeAgent(true, 'All data updated successfully for today');
-        setTimeout(() => {
-          onSuccess?.();
-          window.location.reload();
-        }, 2000);
+    const pollStatus = async () => {
+      try {
+        const { api } = await import('@/lib/api');
+        const state = await api.getAgentStatus();
+        
+        // Match the backend progress array and status
+        if (state.progress && Array.isArray(state.progress)) {
+          // Instead of adding one by one, replace the full state progress
+          // Assuming agentState allows this or we just use our own local state
+          setProgress(state.progress);
+        }
+        
+        if (state.status !== 'running') {
+          setStatus(state.status);
+          setMessage(state.message);
+          clearInterval(timer);
+          setTimeout(() => {
+            onSuccess?.();
+            window.location.reload();
+          }, 2000);
+        }
+      } catch (err) {
+        console.error("Error polling agent:", err);
       }
-    }, 1200);
+    };
+
+    timer = setInterval(pollStatus, 1500);
 
     return () => clearInterval(timer);
-  }, [status, progress.length, onSuccess]);
+  }, [status, onSuccess]);
 
-  const handleRunAgent = useCallback(() => {
+  const handleRunAgent = useCallback(async () => {
     resetAgentState();
     setIsOpen(true);
-    startAgent();
+    setStatus('running'); // Force local state to trigger polling
+    setProgress(['🚀 Triggering backend pipeline...']);
+    try {
+      const { api } = await import('@/lib/api');
+      await api.triggerAgent();
+    } catch (err) {
+      setStatus('error');
+      setMessage('Failed to start agent on backend.');
+    }
   }, []);
 
   return (

@@ -138,5 +138,17 @@ export const api = {
 
   markAllAlertsRead: async (): Promise<void> => {
     await fetch(`${API_BASE}/alerts/mark-all-read`, { method: 'PATCH' });
+  },
+
+  triggerAgent: async (): Promise<any> => {
+    const res = await fetch(`${API_BASE}/agents/run`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to trigger agent');
+    return res.json();
+  },
+
+  getAgentStatus: async (): Promise<any> => {
+    const res = await fetch(`${API_BASE}/agents/status`);
+    if (!res.ok) throw new Error('Failed to get agent status');
+    return res.json();
   }
 };
