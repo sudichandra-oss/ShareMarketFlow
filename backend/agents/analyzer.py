@@ -4,7 +4,7 @@ Identifies trends, top buyers/sellers, sector rotation, and generates structured
 """
 
 from crewai import Agent, Task
-from crewai_tools import BaseTool
+from crewai.tools import BaseTool
 import json
 
 
