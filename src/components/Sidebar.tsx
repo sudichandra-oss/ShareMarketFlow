@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import {
   LayoutDashboard, TrendingUp, TrendingDown,
   PieChart, Search, Lightbulb, Bell, Zap,
   Activity, ChevronRight, Globe
 } from 'lucide-react';
+import { subscribeToAgentState } from '@/lib/agentState';
 
 const navItems = [
   { href: '/',          icon: LayoutDashboard, label: 'Overview',        badge: null },
@@ -20,6 +22,19 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [agentStatus, setAgentStatus] = useState({ status: 'idle', progress: [] as string[] });
+
+  // Subscribe to agent state changes
+  useEffect(() => {
+    const unsubscribe = subscribeToAgentState((state) => {
+      setAgentStatus({
+        status: state.status,
+        progress: state.progress,
+      });
+    });
+
+    return unsubscribe;
+  }, []);
 
   return (
     <aside style={{
@@ -108,20 +123,58 @@ export default function Sidebar() {
       <div style={{ padding: '12px', borderTop: '1px solid #1e2d3d' }}>
         <div style={{
           padding: '10px 12px',
-          background: 'rgba(59,130,246,0.08)',
+          background: agentStatus.status === 'running' 
+            ? 'rgba(59,130,246,0.12)' 
+            : 'rgba(59,130,246,0.08)',
           borderRadius: 8,
           border: '1px solid rgba(59,130,246,0.2)',
+          transition: 'all 0.3s',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <Zap size={12} color="#f59e0b" />
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b' }}>AGENTS RUNNING</span>
+            <Zap 
+              size={12} 
+              color={agentStatus.status === 'running' ? '#f59e0b' : '#3b82f6'}
+              style={{
+                animation: agentStatus.status === 'running' ? 'pulse 1.5s infinite' : 'none',
+              }}
+            />
+            <span style={{ 
+              fontSize: 10, 
+              fontWeight: 700, 
+              color: agentStatus.status === 'running' ? '#f59e0b' : '#3b82f6',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}>
+              {agentStatus.status === 'running' ? '🔄 RUNNING' : '✓ SCHEDULED'}
+            </span>
           </div>
-          <div style={{ fontSize: 9, color: '#4a6178' }}>Next run: Today 4:00 PM IST</div>
+          <div style={{ fontSize: 9, color: '#4a6178' }}>
+            {agentStatus.status === 'running' 
+              ? `Progress: ${(agentStatus.progress?.length || 0)} step${(agentStatus.progress?.length || 0) !== 1 ? 's' : ''}`
+              : 'Next run: Today 4:00 PM IST'
+            }
+          </div>
           <div style={{ marginTop: 6, height: 3, background: '#1e2d3d', borderRadius: 2 }}>
-            <div style={{ width: '72%', height: '100%', background: 'linear-gradient(90deg,#3b82f6,#8b5cf6)', borderRadius: 2 }} />
+            <div style={{ 
+              width: agentStatus.status === 'running' ? '100%' : '72%', 
+              height: '100%', 
+              background: agentStatus.status === 'running' 
+                ? 'linear-gradient(90deg,#f59e0b,#3b82f6)' 
+                : 'linear-gradient(90deg,#3b82f6,#8b5cf6)', 
+              borderRadius: 2,
+              transition: 'width 0.3s',
+              animation: agentStatus.status === 'running' ? 'pulse 1.5s infinite' : 'none',
+            }} />
           </div>
         </div>
       </div>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.7; }
+        }
+      `}</style>
     </aside>
   );
 }

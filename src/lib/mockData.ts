@@ -1,5 +1,23 @@
 // Central mock data for all pages — mimics what the FastAPI backend returns
 
+// Market indices data
+export const MARKET_INDICES = {
+  date: '2025-04-07',
+  nifty50: {
+    value: 24187.45,
+    change: -101.30,
+    change_pct: -0.42,
+  },
+  sensex: {
+    value: 79842.15,
+    change: -303.60,
+    change_pct: -0.38,
+  },
+  nse: {
+    value: -0.42,
+  },
+};
+
 export const MOCK_FLOWS = Array.from({ length: 30 }, (_, i) => {
   const date = new Date();
   date.setDate(date.getDate() - (29 - i));
