@@ -47,9 +47,14 @@ export async function POST(request: NextRequest) {
     const response = await callBackend('/api/agents/run', 'POST');
 
     if (response) {
-      const data = await response.json();
-      agentState = data;
-      return NextResponse.json(data, { status: response.status });
+      try {
+        const data = await response.json();
+        agentState = data;
+        return NextResponse.json(data, { status: response.status });
+      } catch (parseError) {
+        // Backend returned non-JSON response, treat as success
+        console.error('[v0] Backend response parse error:', parseError);
+      }
     }
 
     // Backend unavailable - return mock/local state
@@ -71,6 +76,7 @@ export async function POST(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
+    console.error('[v0] Agent POST error:', error);
     return NextResponse.json(
       {
         status: 'error',

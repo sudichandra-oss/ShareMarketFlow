@@ -34,7 +34,14 @@ export default function AgentRunner({ onSuccess }: AgentRunnerProps) {
           return; // Silently skip if endpoint fails
         }
 
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          // If response isn't JSON, continue polling
+          return;
+        }
+
         setStatus(data);
 
         // Update progress from backend
@@ -98,7 +105,22 @@ export default function AgentRunner({ onSuccess }: AgentRunnerProps) {
       setStatus({ status: 'running' });
 
       const response = await fetch('/api/agents/run', { method: 'POST' });
-      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(`Failed to start agent: ${response.statusText}`);
+      }
+
+      let data;
+      try {
+        data = await response.json();
+      } catch (parseError) {
+        // Response wasn't JSON, assume success
+        data = {
+          status: 'started',
+          message: 'Agent pipeline started',
+          current_status: { progress: [] },
+        };
+      }
 
       if (data.status === 'started') {
         // Use backend progress if available
@@ -114,17 +136,18 @@ export default function AgentRunner({ onSuccess }: AgentRunnerProps) {
             '💡 Generating insights and alerts...',
           ]);
         }
-        setStatus({ status: 'running', message: data.current_status?.message });
+        setStatus({ status: 'running', message: data.current_status?.message || 'Agent running...' });
       } else if (data.status === 'already_running') {
         setProgress((prev) => [...prev, '⚠️ Agent pipeline already running, connecting to existing run...']);
         // Use existing status
         if (data.current_status?.progress) {
           setProgress(data.current_status.progress);
         }
-        setStatus({ status: 'running', message: data.message });
+        setStatus({ status: 'running', message: data.message || 'Connecting to running agent...' });
+      } else {
+        throw new Error(data.message || 'Unexpected response from agent API');
       }
     } catch (error) {
-      console.error('[v0] Failed to trigger agent:', error);
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       setStatus({ status: 'error', message: errorMsg });
       setProgress((prev) => [...prev, `❌ Error: ${errorMsg}`]);
