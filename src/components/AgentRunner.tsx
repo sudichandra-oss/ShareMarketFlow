@@ -23,11 +23,18 @@ export default function AgentRunner({ onSuccess }: AgentRunnerProps) {
   useEffect(() => {
     if (status.status !== 'running') return;
 
+    let isCompleted = false;
+
     const pollStatus = async () => {
+      if (isCompleted) return;
+
       try {
         const response = await fetch('/api/agents/status');
+        if (!response.ok) {
+          return; // Silently skip if endpoint fails
+        }
+
         const data = await response.json();
-        
         setStatus(data);
 
         // Update progress from backend
@@ -36,43 +43,52 @@ export default function AgentRunner({ onSuccess }: AgentRunnerProps) {
         }
 
         // Check if agent finished
-        if ((data.status === 'idle' || data.status === 'success') && data.last_result) {
-          // Agent finished successfully
-          setProgress((prev) => {
-            const updated = [...prev];
-            if (!updated[updated.length - 1]?.includes('Pipeline complete')) {
-              updated.push(`✅ Pipeline complete at ${new Date().toLocaleTimeString()} — refreshing data...`);
-            }
-            return updated;
-          });
-          
-          // Wait a moment then callback
-          setTimeout(() => {
-            onSuccess?.();
-            // Refresh page data
-            window.location.reload();
-          }, 2000);
-        } else if (data.status === 'error') {
-          setProgress((prev) => {
-            const updated = [...prev];
-            if (!updated[updated.length - 1]?.includes('Error')) {
-              updated.push(`❌ Error: ${data.message || data.last_result}`);
-            }
-            return updated;
-          });
+        if (data.status === 'success' || data.status === 'error') {
+          isCompleted = true;
+
+          if (data.status === 'success') {
+            // Agent finished successfully
+            setProgress((prev) => {
+              const updated = [...prev];
+              if (!updated[updated.length - 1]?.includes('Pipeline complete')) {
+                updated.push(`✅ Pipeline complete at ${new Date().toLocaleTimeString()}`);
+              }
+              return updated;
+            });
+            
+            // Wait a moment then reload
+            setTimeout(() => {
+              onSuccess?.();
+              window.location.reload();
+            }, 2000);
+          } else if (data.status === 'error') {
+            setProgress((prev) => {
+              const updated = [...prev];
+              if (!updated[updated.length - 1]?.includes('Error')) {
+                updated.push(`❌ Error: ${data.message || data.last_result}`);
+              }
+              return updated;
+            });
+          }
         }
       } catch (error) {
-        console.error('[v0] Failed to check agent status:', error);
+        // Silently fail - no need to log
       }
     };
 
     // Initial poll
     pollStatus();
 
-    // Set up interval for subsequent polls
-    const interval = setInterval(pollStatus, 1000);
+    // Set up interval for subsequent polls (only if not completed)
+    const interval = setInterval(() => {
+      if (!isCompleted) {
+        pollStatus();
+      }
+    }, 1000);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+    };
   }, [status.status, onSuccess]);
 
   const handleRunAgent = useCallback(async () => {
