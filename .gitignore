@@ -1,0 +1,32 @@
+# ShareMarketFlow — Dependencies
+node_modules/
+.next/
+.env.local
+.env*.local
+dist/
+build/
+
+# Python
+backend/__pycache__/
+backend/**/__pycache__/
+backend/*.pyc
+backend/.venv/
+backend/venv/
+backend/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
+
+# DB
+*.sqlite
+*.db
+pgdata/
