@@ -72,9 +72,9 @@ export default function AgentRunner({ onSuccess }: AgentRunnerProps) {
     try {
       const { api } = await import('@/lib/api');
       await api.triggerAgent();
-    } catch (err) {
+    } catch (err: any) {
       setStatus('error');
-      setMessage('Failed to start agent on backend.');
+      setMessage(`Failed to start agent: ${err?.message || 'Unknown error'}`);
     }
   }, []);
 

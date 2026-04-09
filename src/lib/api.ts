@@ -1,6 +1,7 @@
 // Frontend API Client
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api';
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
 
 export interface Flow {
   date: string;
@@ -141,8 +142,17 @@ export const api = {
   },
 
   triggerAgent: async (): Promise<any> => {
-    const res = await fetch(`${API_BASE}/agents/run`, { method: 'POST' });
-    if (!res.ok) throw new Error('Failed to trigger agent');
+    const res = await fetch(`${API_BASE}/agents/run`, { 
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => 'No text');
+      console.error(`Failed to trigger agent: ${res.status} ${res.statusText}`, errText);
+      throw new Error(`Failed to trigger agent: ${res.status} ${errText}`);
+    }
     return res.json();
   },
 
