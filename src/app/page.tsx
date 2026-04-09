@@ -128,7 +128,7 @@ export default function OverviewPage() {
                 fontSize: 12,
                 color: '#10b981',
               }}>
-                💡 {insight.summary.slice(0, 120)}...
+                💡 {insight.summary?.slice(0, 120) || 'Waiting for next AI analysis generation'}...
               </div>
             </>
           )}
