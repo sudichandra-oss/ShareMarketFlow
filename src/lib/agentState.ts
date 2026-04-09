@@ -19,6 +19,7 @@ const initialState: AgentState = {
 
 let agentState = { ...initialState };
 let listeners: ((state: AgentState) => void)[] = [];
+let completionListeners: ((success: boolean, message: string) => void)[] = [];
 
 /**
  * Get current agent state
@@ -45,6 +46,19 @@ export function subscribeToAgentState(
   // Unsubscribe function
   return () => {
     listeners = listeners.filter((listener) => listener !== callback);
+  };
+}
+
+/**
+ * Subscribe to agent completion events
+ */
+export function subscribeToAgentCompletion(
+  callback: (success: boolean, message: string) => void
+): () => void {
+  completionListeners.push(callback);
+  // Unsubscribe function
+  return () => {
+    completionListeners = completionListeners.filter((listener) => listener !== callback);
   };
 }
 
@@ -91,6 +105,9 @@ export function completeAgent(success: boolean, message: string = '') {
   } else {
     addProgress(`❌ Error: ${message}`);
   }
+
+  // Emit completion event to listeners
+  completionListeners.forEach((listener) => listener(success, message));
 }
 
 /**
