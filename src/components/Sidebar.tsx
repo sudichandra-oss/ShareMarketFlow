@@ -8,6 +8,7 @@ import {
   PieChart, Search, Lightbulb, Bell, Zap,
   Activity, ChevronRight, Globe
 } from 'lucide-react';
+import { subscribeToAgentState } from '@/lib/agentState';
 
 const navItems = [
   { href: '/',          icon: LayoutDashboard, label: 'Overview',        badge: null },
@@ -21,24 +22,18 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const [agentStatus, setAgentStatus] = useState<{ status: string; progress?: string[] }>({ status: 'idle' });
+  const [agentStatus, setAgentStatus] = useState({ status: 'idle', progress: [] as string[] });
 
-  // Poll agent status every 2 seconds
+  // Subscribe to agent state changes
   useEffect(() => {
-    const pollStatus = async () => {
-      try {
-        const response = await fetch('/api/agents/status');
-        const data = await response.json();
-        setAgentStatus(data);
-      } catch (error) {
-        // Silent fail - agent API might not be ready
-      }
-    };
+    const unsubscribe = subscribeToAgentState((state) => {
+      setAgentStatus({
+        status: state.status,
+        progress: state.progress,
+      });
+    });
 
-    const interval = setInterval(pollStatus, 2000);
-    pollStatus(); // Initial poll
-
-    return () => clearInterval(interval);
+    return unsubscribe;
   }, []);
 
   return (
