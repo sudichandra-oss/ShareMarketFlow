@@ -3,66 +3,42 @@
 import { ReactNode, useState, useEffect } from 'react';
 import Sidebar from './Sidebar';
 import AgentRunner from './AgentRunner';
-import { MARKET_INDICES } from '@/lib/mockData';
 import { subscribeToAgentCompletion } from '@/lib/agentState';
+import { useMarketData } from '@/lib/hooks';
 
 export default function AppLayout({ children, title, subtitle }: {
   children: ReactNode;
   title: string;
   subtitle?: string;
 }) {
-  const [marketData, setMarketData] = useState(MARKET_INDICES);
-
-  // Function to refresh market data
-  const refreshMarketData = () => {
-    // Simulate updated market data (in production, fetch from backend)
-    const niftyChange = (Math.random() - 0.5) * 500;
-    const sensexChange = (Math.random() - 0.5) * 1500;
-    
-    setMarketData({
-      ...MARKET_INDICES,
-      date: new Date().toISOString().split('T')[0],
-      nifty50: {
-        value: 24187.45 + niftyChange,
-        change: -101.30 + (Math.random() - 0.5) * 200,
-        change_pct: (niftyChange / 24187.45) * 100,
-      },
-      sensex: {
-        value: 79842.15 + sensexChange,
-        change: -303.60 + (Math.random() - 0.5) * 600,
-        change_pct: (sensexChange / 79842.15) * 100,
-      },
-      nse: {
-        value: (niftyChange / 24187.45) * 100,
-      },
-    });
-  };
+  // Fetch market data from database
+  const { data: marketData, refetch: refetchMarketData } = useMarketData();
 
   // Listen for agent completion and refresh market data
   useEffect(() => {
     const unsubscribe = subscribeToAgentCompletion((success, message) => {
       if (success) {
         // Refresh market data after agent completes
-        refreshMarketData();
+        refetchMarketData();
       }
     });
 
     // Listen for page visibility to refresh data on focus
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        refreshMarketData();
+        refetchMarketData();
       }
     };
 
-    window.addEventListener('focus', refreshMarketData);
+    window.addEventListener('focus', refetchMarketData);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       unsubscribe();
-      window.removeEventListener('focus', refreshMarketData);
+      window.removeEventListener('focus', refetchMarketData);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [refetchMarketData]);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#080b14' }}>
@@ -84,25 +60,31 @@ export default function AppLayout({ children, title, subtitle }: {
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{ fontSize: 11, color: '#4a6178', display: 'flex', alignItems: 'center', gap: 12 }}>
               <span>
-                {new Date(marketData.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
+                {marketData ? new Date(marketData.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' }) : new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}
               </span>
               <span style={{ color: '#8ba5c0' }}>|</span>
-              <span>
-                NIFTY 50: <span style={{ 
-                  color: marketData.nifty50.change_pct >= 0 ? '#10b981' : '#ef4444',
-                  fontFamily: 'JetBrains Mono, monospace',
-                  fontWeight: 600,
-                }}>
-                  {marketData.nifty50.value.toFixed(2)} 
-                  <span style={{ fontSize: 9, marginLeft: 4 }}>
-                    ({marketData.nifty50.change_pct >= 0 ? '+' : ''}{marketData.nifty50.change_pct.toFixed(2)}%)
+              {marketData ? (
+                <>
+                  <span>
+                    NIFTY 50: <span style={{ 
+                      color: marketData.nifty50_change_pct >= 0 ? '#10b981' : '#ef4444',
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontWeight: 600,
+                    }}>
+                      {marketData.nifty50_value.toFixed(2)} 
+                      <span style={{ fontSize: 9, marginLeft: 4 }}>
+                        ({marketData.nifty50_change_pct >= 0 ? '+' : ''}{marketData.nifty50_change_pct.toFixed(2)}%)
+                      </span>
+                    </span>
                   </span>
-                </span>
-              </span>
-              <span style={{ color: '#8ba5c0' }}>|</span>
-              <span style={{ color: '#f59e0b' }}>NSE: {marketData.nse.value.toFixed(2)}%</span> 
-              <span style={{ color: '#8ba5c0' }}>|</span>
-              <span style={{ color: '#ef4444' }}>SENSEX: {marketData.sensex.change_pct.toFixed(2)}%</span>
+                  <span style={{ color: '#8ba5c0' }}>|</span>
+                  <span style={{ color: '#f59e0b' }}>NSE: {marketData.nse_change_pct.toFixed(2)}%</span> 
+                  <span style={{ color: '#8ba5c0' }}>|</span>
+                  <span style={{ color: '#ef4444' }}>SENSEX: {marketData.sensex_change_pct.toFixed(2)}%</span>
+                </>
+              ) : (
+                <span style={{ color: '#4a6178' }}>Loading market data...</span>
+              )}
             </div>
             <AgentRunner />
           </div>
