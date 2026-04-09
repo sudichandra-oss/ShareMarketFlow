@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react';
 import Sidebar from './Sidebar';
+import AgentRunner from './AgentRunner';
 
 export default function AppLayout({ children, title, subtitle }: {
   children: ReactNode;
@@ -29,18 +30,7 @@ export default function AppLayout({ children, title, subtitle }: {
             <div style={{ fontSize: 11, color: '#4a6178' }}>
               Mon, Apr 7, 2025 &nbsp;|&nbsp; <span style={{ color: '#f59e0b' }}>NSE: -0.42%</span> &nbsp;|&nbsp; <span style={{ color: '#ef4444' }}>SENSEX: -0.38%</span>
             </div>
-            <div style={{
-              padding: '6px 14px',
-              background: 'rgba(59,130,246,0.12)',
-              border: '1px solid rgba(59,130,246,0.3)',
-              borderRadius: 20,
-              fontSize: 11,
-              fontWeight: 600,
-              color: '#3b82f6',
-              cursor: 'pointer',
-            }}>
-              ⚡ Run Agents
-            </div>
+            <AgentRunner />
           </div>
         </header>
 
