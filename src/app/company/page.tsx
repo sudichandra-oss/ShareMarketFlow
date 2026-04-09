@@ -1,19 +1,47 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import AppLayout from '@/components/AppLayout';
-import { MOCK_COMPANIES, MOCK_BULK_DEALS } from '@/lib/mockData';
 import { Search } from 'lucide-react';
-import { useState } from 'react';
-import Link from 'next/link';
-import ScoreGauge from '@/components/ScoreGauge';
+import { api, Company, BulkDeal } from '@/lib/api';
 
 export default function CompanyPage() {
+  const [companies, setCompanies] = useState<Company[]>([]);
+  const [deals, setDeals] = useState<BulkDeal[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const filtered = MOCK_COMPANIES.filter(c =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.ticker.toLowerCase().includes(search.toLowerCase()) ||
-    c.sector.toLowerCase().includes(search.toLowerCase())
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [compRes, dealRes] = await Promise.all([
+          api.getCompanies(),
+          api.getDeals(),
+        ]);
+        setCompanies(compRes || []);
+        setDeals(dealRes || []);
+      } catch (err) {
+        console.error('Failed to load company data', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  const filtered = companies.filter(c =>
+    (c.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.ticker || '').toLowerCase().includes(search.toLowerCase()) ||
+    (c.sector || '').toLowerCase().includes(search.toLowerCase())
   );
+
+  if (loading) {
+    return (
+      <AppLayout title="Company Deep Dive" subtitle="Loading data...">
+        <div style={{ padding: 40, textAlign: 'center', color: '#8ba5c0' }}>Loading data...</div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title="Company Deep Dive" subtitle="Institutional ownership by company">
@@ -93,6 +121,11 @@ export default function CompanyPage() {
             </div>
           </div>
         ))}
+        {filtered.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: '#8ba5c0', gridColumn: '1 / -1' }}>
+            No companies found.
+          </div>
+        )}
       </div>
 
       {/* Recent bulk deals for these companies */}
@@ -116,7 +149,7 @@ export default function CompanyPage() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_BULK_DEALS.map((d, i) => (
+            {deals.map((d, i) => (
               <tr key={i}>
                 <td style={{ color: '#4a6178', fontSize: 11 }}>{d.date}</td>
                 <td style={{ fontWeight: 700, color: '#3b82f6' }}>{d.symbol}</td>
@@ -137,6 +170,11 @@ export default function CompanyPage() {
                 </td>
               </tr>
             ))}
+            {deals.length === 0 && (
+              <tr>
+                <td colSpan={9} style={{ textAlign: 'center', padding: 20, color: '#8ba5c0' }}>No recent deals found</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>

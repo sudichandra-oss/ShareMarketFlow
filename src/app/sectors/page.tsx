@@ -1,21 +1,48 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import KPICard from '@/components/KPICard';
 import SectorHeatmap from '@/components/SectorHeatmap';
-import { MOCK_SECTORS } from '@/lib/mockData';
 import { ArrowUpRight, ArrowDownRight } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   Legend, ScatterChart, Scatter, Cell
 } from 'recharts';
+import { api, SectorData } from '@/lib/api';
 
 export default function SectorsPage() {
-  const topSector = [...MOCK_SECTORS].sort((a, b) => b.total_flow - a.total_flow)[0];
-  const totalFII = MOCK_SECTORS.reduce((a, b) => a + b.fii_flow, 0);
-  const totalDII = MOCK_SECTORS.reduce((a, b) => a + b.dii_flow, 0);
+  const [sectors, setSectors] = useState<SectorData[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const flowData = MOCK_SECTORS.slice(0, 8).map(s => ({
+  useEffect(() => {
+    async function fetchSectors() {
+      try {
+        const data = await api.getSectors('momentum');
+        setSectors(data || []);
+      } catch (err) {
+        console.error('Failed to load sectors', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchSectors();
+  }, []);
+
+  if (loading) {
+    return (
+      <AppLayout title="Sector Analysis" subtitle="Loading sector data...">
+        <div style={{ padding: 40, textAlign: 'center', color: '#8ba5c0' }}>Loading data...</div>
+      </AppLayout>
+    );
+  }
+
+  const sortedByFlow = [...sectors].sort((a, b) => b.total_flow - a.total_flow);
+  const topSector = sortedByFlow.length > 0 ? sortedByFlow[0] : null;
+  const totalFII = sectors.reduce((a, b) => a + b.fii_flow, 0);
+  const totalDII = sectors.reduce((a, b) => a + b.dii_flow, 0);
+
+  const flowData = sectors.slice(0, 8).map(s => ({
     name: s.name.split(' ')[0],
     FII: Math.round(s.fii_flow),
     DII: Math.round(s.dii_flow),
@@ -25,10 +52,10 @@ export default function SectorsPage() {
     <AppLayout title="Sector Analysis" subtitle="Institutional money flow by market sector">
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <KPICard title="Top Sector Today" value={topSector.name.split(' ')[0]} sub={`₹${topSector.total_flow.toLocaleString()} Cr inflow`} trend="up" trendValue={`+${topSector.change_pct}%`} accent="green" icon={<ArrowUpRight size={16} />} />
+        <KPICard title="Top Sector Today" value={topSector ? topSector.name.split(' ')[0] : 'N/A'} sub={`₹${(topSector?.total_flow || 0).toLocaleString()} Cr inflow`} trend="up" trendValue={`+${topSector?.change_pct || 0}%`} accent="green" icon={<ArrowUpRight size={16} />} />
         <KPICard title="FII Sector Total" value={`${totalFII >= 0 ? '+' : ''}₹${totalFII.toLocaleString()} Cr`} trend={totalFII >= 0 ? 'up' : 'down'} trendValue="All sectors" accent={totalFII >= 0 ? 'blue' : 'red'} />
         <KPICard title="DII Sector Total" value={`+₹${totalDII.toLocaleString()} Cr`} trend="up" trendValue="All sectors" accent="green" />
-        <KPICard title="Sectors in +ve Flow" value={`${MOCK_SECTORS.filter(s => s.total_flow > 0).length}/${MOCK_SECTORS.length}`} sub="sectors bullish" trend="up" trendValue="67% breadth" accent="purple" />
+        <KPICard title="Sectors in +ve Flow" value={`${sectors.filter(s => s.total_flow > 0).length}/${sectors.length}`} sub="sectors bullish" trend="up" trendValue={`${Math.round((sectors.filter(s => s.total_flow > 0).length / Math.max(1, sectors.length)) * 100)}% breadth`} accent="purple" />
       </div>
 
       {/* Heatmap */}
@@ -37,7 +64,7 @@ export default function SectorsPage() {
           <div className="section-title">Sector Momentum Heatmap</div>
           <div className="section-subtitle">Institutional momentum score by sector (AI-computed)</div>
         </div>
-        <SectorHeatmap />
+        <SectorHeatmap sectors={sectors} />
       </div>
 
       {/* FII vs DII bar by sector */}
@@ -69,7 +96,7 @@ export default function SectorsPage() {
             <div className="section-title">Sector Rankings</div>
           </div>
           <div style={{ overflowY: 'auto', maxHeight: 320 }}>
-            {[...MOCK_SECTORS].sort((a, b) => b.total_flow - a.total_flow).map((s, i) => (
+            {sortedByFlow.map((s, i) => (
               <div key={s.name} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                 padding: '8px 0',

@@ -1,9 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import AppLayout from '@/components/AppLayout';
-import { MOCK_ALERTS } from '@/lib/mockData';
 import { Bell, BellOff, AlertTriangle, TrendingUp, Info, Filter } from 'lucide-react';
-import { useState } from 'react';
+import { api, AppAlert } from '@/lib/api';
 
 const SEVERITY_CONFIG = {
   HIGH:   { color: '#ef4444', bg: 'rgba(239,68,68,0.1)',   border: 'rgba(239,68,68,0.3)',   icon: AlertTriangle },
@@ -19,9 +19,24 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function AlertsPage() {
-  const [alerts, setAlerts] = useState(MOCK_ALERTS);
+  const [alerts, setAlerts] = useState<AppAlert[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'ALL' | 'HIGH' | 'MEDIUM' | 'LOW'>('ALL');
   const [typeFilter, setTypeFilter] = useState('ALL');
+
+  useEffect(() => {
+    async function fetchAlerts() {
+      try {
+        const data = await api.getAlerts();
+        setAlerts(data || []);
+      } catch (err) {
+        console.error('Failed to load alerts', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchAlerts();
+  }, []);
 
   const filtered = alerts.filter(a =>
     (filter === 'ALL' || a.severity === filter) &&
@@ -29,8 +44,33 @@ export default function AlertsPage() {
   );
   const unread = alerts.filter(a => !a.is_read).length;
 
-  const markAllRead = () => setAlerts(prev => prev.map(a => ({ ...a, is_read: true })));
-  const markRead = (id: number) => setAlerts(prev => prev.map(a => a.id === id ? { ...a, is_read: true } : a));
+  const markAllRead = async () => {
+    try {
+      await api.markAllAlertsRead();
+      setAlerts(prev => prev.map(a => ({ ...a, is_read: true })));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const markRead = async (id: number) => {
+    const alert = alerts.find(a => a.id === id);
+    if (!alert || alert.is_read) return;
+    try {
+      await api.markAlertRead(id);
+      setAlerts(prev => prev.map(a => a.id === id ? { ...a, is_read: true } : a));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <AppLayout title="Alerts & Notifications" subtitle="Loading alerts...">
+        <div style={{ padding: 40, textAlign: 'center', color: '#8ba5c0' }}>Loading data...</div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout title="Alerts & Notifications" subtitle="Real-time FII/DII activity alerts">
@@ -38,7 +78,7 @@ export default function AlertsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
           { label: 'Unread Alerts', value: unread, color: '#ef4444', sub: 'today' },
-          { label: 'High Priority', value: alerts.filter(a => a.severity === 'HIGH').length, color: '#ef4444', sub: '3 unread' },
+          { label: 'High Priority', value: alerts.filter(a => a.severity === 'HIGH').length, color: '#ef4444', sub: `${alerts.filter(a => a.severity === 'HIGH' && !a.is_read).length} unread` },
           { label: 'Large Deals', value: alerts.filter(a => a.type === 'LARGE_DEAL').length, color: '#f59e0b', sub: '> ₹1000 Cr' },
           { label: 'Stake Changes', value: alerts.filter(a => a.type === 'STAKE_CHANGE').length, color: '#3b82f6', sub: '> 0.5% change' },
         ].map(({ label, value, color, sub }) => (
@@ -101,7 +141,7 @@ export default function AlertsPage() {
       {/* Alert cards */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         {filtered.map(alert => {
-          const cfg = SEVERITY_CONFIG[alert.severity as keyof typeof SEVERITY_CONFIG];
+          const cfg = SEVERITY_CONFIG[alert.severity as keyof typeof SEVERITY_CONFIG] || SEVERITY_CONFIG.LOW;
           const SevIcon = cfg.icon;
           return (
             <div
@@ -135,7 +175,7 @@ export default function AlertsPage() {
                   <span style={{ fontSize: 11, fontWeight: 700, color: cfg.color, letterSpacing: '0.04em' }}>
                     {alert.severity}
                   </span>
-                  <span className="badge badge-blue" style={{ fontSize: 9 }}>{TYPE_LABELS[alert.type]}</span>
+                  <span className="badge badge-blue" style={{ fontSize: 9 }}>{TYPE_LABELS[alert.type] || alert.type}</span>
                   {!alert.is_read && (
                     <span style={{ width: 6, height: 6, borderRadius: '50%', background: cfg.color, flexShrink: 0 }} />
                   )}
@@ -148,14 +188,21 @@ export default function AlertsPage() {
 
               {/* Right: value + time */}
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#10b981', fontFamily: 'JetBrains Mono, monospace' }}>
-                  ₹{alert.value_cr.toLocaleString()} Cr
-                </div>
+                {alert.value_cr && (
+                  <div style={{ fontSize: 16, fontWeight: 800, color: '#10b981', fontFamily: 'JetBrains Mono, monospace' }}>
+                    ₹{Number(alert.value_cr).toLocaleString()} Cr
+                  </div>
+                )}
                 <div style={{ fontSize: 11, color: '#4a6178', marginTop: 4 }}>{alert.time} IST</div>
               </div>
             </div>
           );
         })}
+        {filtered.length === 0 && (
+          <div style={{ padding: 40, textAlign: 'center', color: '#8ba5c0' }}>
+            No alerts found for current filters.
+          </div>
+        )}
       </div>
 
       {/* Alert config */}

@@ -77,6 +77,7 @@ def _run_mock_pipeline() -> dict:
         "insight": insight,
         "alerts": all_alerts,
         "analysis": analysis,
+        "clean_deals": clean_deals,
     }
 
     logger.info(f"✅ Pipeline complete: {len(clean_deals)} deals, {len(all_alerts)} alerts")

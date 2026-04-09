@@ -1,29 +1,59 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import KPICard from '@/components/KPICard';
-import { MOCK_TOP_FII, MOCK_FLOWS } from '@/lib/mockData';
 import { Globe, TrendingUp, TrendingDown, Search } from 'lucide-react';
-import { useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-
-const today = MOCK_FLOWS[MOCK_FLOWS.length - 1];
-const weekFlows = MOCK_FLOWS.slice(-5);
-const weekNet = weekFlows.reduce((a, b) => a + b.fii_net, 0);
-const monthFlows = MOCK_FLOWS.slice(-22);
-const monthNet = monthFlows.reduce((a, b) => a + b.fii_net, 0);
+import { api, Flow, InstitutionActivity } from '@/lib/api';
 
 export default function FIIPage() {
+  const [flows, setFlows] = useState<Flow[]>([]);
+  const [topFII, setTopFII] = useState<InstitutionActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'aum' | 'change'>('aum');
 
-  const filtered = MOCK_TOP_FII
-    .filter(f => f.name.toLowerCase().includes(search.toLowerCase()) || f.country.toLowerCase().includes(search.toLowerCase()))
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [fRes, fiiRes] = await Promise.all([
+          api.getDailyFlows(30),
+          api.getTopFII(50), // Fetch more for the table
+        ]);
+        setFlows(fRes);
+        setTopFII(fiiRes);
+      } catch (err) {
+        console.error('Failed to load FII data', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <AppLayout title="FII Tracker" subtitle="Loading FII data...">
+        <div style={{ padding: 40, textAlign: 'center', color: '#8ba5c0' }}>Loading data...</div>
+      </AppLayout>
+    );
+  }
+
+  const today = flows.length > 0 ? flows[flows.length - 1] : { fii_net: 0 };
+  const weekFlows = flows.slice(-5);
+  const weekNet = weekFlows.reduce((a, b) => a + b.fii_net, 0);
+  const monthFlows = flows.slice(-22);
+  const monthNet = monthFlows.reduce((a, b) => a + b.fii_net, 0);
+
+  const filtered = topFII
+    .filter(f => f.name.toLowerCase().includes(search.toLowerCase()) || (f.country || '').toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => sortBy === 'aum' ? b.aum_cr - a.aum_cr : b.change_cr - a.change_cr);
 
-  const barData = MOCK_TOP_FII.slice(0, 8).map(f => ({
+  const barData = topFII.slice(0, 8).map(f => ({
     name: f.name.split(' ')[0],
     change: Math.round(f.change_cr),
   }));
@@ -32,7 +62,7 @@ export default function FIIPage() {
     <AppLayout title="FII Tracker" subtitle="Foreign Institutional Investor activity — Real-time">
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <KPICard title="Today FII Net" value={`${today.fii_net >= 0 ? '+' : ''}₹${Math.round(today.fii_net).toLocaleString()} Cr`} trend={today.fii_net >= 0 ? 'up' : 'down'} trendValue="Today" accent={today.fii_net >= 0 ? 'blue' : 'red'} icon={<TrendingUp size={16} />} />
+        <KPICard title="Today FII Net" value={`${today.fii_net >= 0 ? '+' : ''}₹${Math.round(today.fii_net).toLocaleString()} Cr`} trend={today.fii_net >= 0 ? 'up' : 'down'} trendValue="Today" accent={today.fii_net >= 0 ? 'blue' : 'red'} icon={today.fii_net >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />} />
         <KPICard title="Week Net Flow" value={`${weekNet >= 0 ? '+' : ''}₹${Math.round(weekNet).toLocaleString()} Cr`} trend={weekNet >= 0 ? 'up' : 'down'} trendValue="5 sessions" accent={weekNet >= 0 ? 'green' : 'red'} sub="5-day" />
         <KPICard title="Month Net Flow" value={`${monthNet >= 0 ? '+' : ''}₹${Math.abs(Math.round(monthNet/1000)).toFixed(1)}K Cr`} trend={monthNet >= 0 ? 'up' : 'down'} trendValue="22 sessions" accent={monthNet >= 0 ? 'blue' : 'red'} sub="MTD" />
         <KPICard title="Active FIIs" value="842" sub="registered with SEBI" trend="up" trendValue="+12 YTD" accent="purple" icon={<Globe size={16} />} />
@@ -132,7 +162,7 @@ export default function FIIPage() {
               <tr key={f.name}>
                 <td style={{ color: '#4a6178' }}>{i + 1}</td>
                 <td style={{ fontWeight: 600, fontSize: 13 }}>{f.name}</td>
-                <td style={{ color: '#8ba5c0' }}>{f.country}</td>
+                <td style={{ color: '#8ba5c0' }}>{f.country || 'Global'}</td>
                 <td style={{ textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
                   ₹{f.aum_cr.toLocaleString()}
                 </td>
@@ -144,12 +174,12 @@ export default function FIIPage() {
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {f.sectors.slice(0, 2).map(s => (
+                    {(f.sectors || []).slice(0, 2).map(s => (
                       <span key={s} className="badge badge-blue" style={{ fontSize: 9 }}>{s}</span>
                     ))}
                   </div>
                 </td>
-                <td style={{ textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{f.holdings_count}</td>
+                <td style={{ textAlign: 'center', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>{f.holdings_count || 0}</td>
                 <td style={{ textAlign: 'center' }}>
                   <span className={`badge ${f.trend === 'BUY' ? 'badge-green' : f.trend === 'SELL' ? 'badge-red' : 'badge-yellow'}`}>
                     {f.trend}

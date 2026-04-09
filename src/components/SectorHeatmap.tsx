@@ -1,6 +1,6 @@
 'use client';
 
-import { MOCK_SECTORS } from '@/lib/mockData';
+import { SectorData } from '@/lib/api';
 
 function getMomentumColor(momentum: number): string {
   if (momentum >= 80) return '#10b981';
@@ -18,7 +18,9 @@ function getMomentumBg(momentum: number): string {
   // Just use inline logic below
 }
 
-export default function SectorHeatmap() {
+export default function SectorHeatmap({ sectors }: { sectors?: SectorData[] }) {
+  if (!sectors || sectors.length === 0) return <div>Loading sector data...</div>;
+
   return (
     <div>
       <div style={{
@@ -26,7 +28,7 @@ export default function SectorHeatmap() {
         gridTemplateColumns: 'repeat(4, 1fr)',
         gap: 8,
       }}>
-        {MOCK_SECTORS.map((s) => {
+        {sectors.map((s) => {
           const color = getMomentumColor(s.momentum);
           const bgOpacity = 0.06 + (s.momentum / 100) * 0.14;
           const bg = color === '#10b981'

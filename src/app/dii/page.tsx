@@ -1,17 +1,14 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import AppLayout from '@/components/AppLayout';
 import KPICard from '@/components/KPICard';
-import { MOCK_TOP_DII, MOCK_FLOWS } from '@/lib/mockData';
-import { TrendingUp, Shield } from 'lucide-react';
+import { TrendingUp, TrendingDown, Shield } from 'lucide-react';
 import {
   PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid
 } from 'recharts';
-
-const today = MOCK_FLOWS[MOCK_FLOWS.length - 1];
-const weekNet = MOCK_FLOWS.slice(-5).reduce((a, b) => a + b.dii_net, 0);
-const monthNet = MOCK_FLOWS.slice(-22).reduce((a, b) => a + b.dii_net, 0);
+import { api, Flow, InstitutionActivity } from '@/lib/api';
 
 const typeBreakdown = [
   { name: 'Mutual Funds', value: 68, color: '#3b82f6' },
@@ -21,7 +18,41 @@ const typeBreakdown = [
 ];
 
 export default function DIIPage() {
-  const barData = MOCK_TOP_DII.map(d => ({
+  const [flows, setFlows] = useState<Flow[]>([]);
+  const [topDII, setTopDII] = useState<InstitutionActivity[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const [fRes, diiRes] = await Promise.all([
+          api.getDailyFlows(30),
+          api.getTopDII(50), 
+        ]);
+        setFlows(fRes);
+        setTopDII(diiRes);
+      } catch (err) {
+        console.error('Failed to load DII data', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  if (loading) {
+    return (
+      <AppLayout title="DII Tracker" subtitle="Loading DII data...">
+        <div style={{ padding: 40, textAlign: 'center', color: '#8ba5c0' }}>Loading data...</div>
+      </AppLayout>
+    );
+  }
+
+  const today = flows.length > 0 ? flows[flows.length - 1] : { dii_net: 0 };
+  const weekNet = flows.slice(-5).reduce((a, b) => a + b.dii_net, 0);
+  const monthNet = flows.slice(-22).reduce((a, b) => a + b.dii_net, 0);
+
+  const barData = topDII.slice(0, 8).map(d => ({
     name: d.name.split(' ')[0],
     change: Math.round(d.change_cr),
     aum: Math.round(d.aum_cr / 1000),
@@ -31,9 +62,9 @@ export default function DIIPage() {
     <AppLayout title="DII Tracker" subtitle="Domestic Institutional Investor activity">
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
-        <KPICard title="Today DII Net" value={`${today.dii_net >= 0 ? '+' : ''}₹${Math.round(today.dii_net).toLocaleString()} Cr`} trend={today.dii_net >= 0 ? 'up' : 'down'} trendValue="Today" accent="green" icon={<TrendingUp size={16} />} />
-        <KPICard title="Week DII Net" value={`+₹${Math.round(weekNet).toLocaleString()} Cr`} trend="up" trendValue="5 sessions" accent="green" sub="5-day" />
-        <KPICard title="Month DII Net" value={`+₹${Math.abs(Math.round(monthNet/1000)).toFixed(1)}K Cr`} trend="up" trendValue="MTD" accent="blue" sub="22 sessions" />
+        <KPICard title="Today DII Net" value={`${today.dii_net >= 0 ? '+' : ''}₹${Math.round(today.dii_net).toLocaleString()} Cr`} trend={today.dii_net >= 0 ? 'up' : 'down'} trendValue="Today" accent={today.dii_net >= 0 ? 'green' : 'red'} icon={today.dii_net >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />} />
+        <KPICard title="Week DII Net" value={`${weekNet >= 0 ? '+' : ''}₹${Math.round(weekNet).toLocaleString()} Cr`} trend={weekNet >= 0 ? 'up' : 'down'} trendValue="5 sessions" accent={weekNet >= 0 ? 'green' : 'red'} sub="5-day" />
+        <KPICard title="Month DII Net" value={`${monthNet >= 0 ? '+' : ''}₹${Math.abs(Math.round(monthNet/1000)).toFixed(1)}K Cr`} trend={monthNet >= 0 ? 'up' : 'down'} trendValue="MTD" accent={monthNet >= 0 ? 'blue' : 'red'} sub="22 sessions" />
         <KPICard title="MF Total AUM" value="₹68.4 Lac Cr" sub="All domestic MFs" trend="up" trendValue="+1.2% MoM" accent="purple" icon={<Shield size={16} />} />
       </div>
 
@@ -115,12 +146,12 @@ export default function DIIPage() {
             </tr>
           </thead>
           <tbody>
-            {MOCK_TOP_DII.map((d, i) => (
+            {topDII.map((d, i) => (
               <tr key={d.name}>
                 <td style={{ color: '#4a6178' }}>{i + 1}</td>
                 <td style={{ fontWeight: 600 }}>{d.name}</td>
                 <td style={{ textAlign: 'center' }}>
-                  <span className={`badge ${d.type === 'MF' ? 'badge-blue' : 'badge-purple'}`}>{d.type}</span>
+                  <span className={`badge ${d.type === 'MF' ? 'badge-blue' : 'badge-purple'}`}>{d.type || 'Inst'}</span>
                 </td>
                 <td style={{ textAlign: 'right', fontFamily: 'JetBrains Mono, monospace', fontSize: 12 }}>
                   ₹{d.aum_cr.toLocaleString()}
@@ -133,7 +164,7 @@ export default function DIIPage() {
                 </td>
                 <td>
                   <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                    {d.top_picks.slice(0, 2).map(s => (
+                    {(d.top_picks || []).slice(0, 2).map(s => (
                       <span key={s} className="badge badge-green" style={{ fontSize: 9 }}>{s}</span>
                     ))}
                   </div>
