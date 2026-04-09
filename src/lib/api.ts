@@ -1,7 +1,7 @@
 // Frontend API Client
 
-const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const API_BASE = rawApiUrl.endsWith('/api') ? rawApiUrl : `${rawApiUrl}/api`;
+// Use the local Next.js proxy by default to completely bypass CORS / DNS issues
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api/backend';
 
 export interface Flow {
   date: string;
