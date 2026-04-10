@@ -11,55 +11,67 @@ export default function AppLayout({ children, title, subtitle }: {
   title: string;
   subtitle?: string;
 }) {
-  const [marketData, setMarketData] = useState(MARKET_INDICES);
+  const [marketData, setMarketData] = useState<any>(MARKET_INDICES);
+  const [loading, setLoading] = useState(true);
 
-  // Function to refresh market data
-  const refreshMarketData = () => {
-    // Simulate updated market data (in production, fetch from backend)
-    const niftyChange = (Math.random() - 0.5) * 500;
-    const sensexChange = (Math.random() - 0.5) * 1500;
-    
-    setMarketData({
-      ...MARKET_INDICES,
-      date: new Date().toISOString().split('T')[0],
-      nifty50: {
-        value: 24187.45 + niftyChange,
-        change: -101.30 + (Math.random() - 0.5) * 200,
-        change_pct: (niftyChange / 24187.45) * 100,
-      },
-      sensex: {
-        value: 79842.15 + sensexChange,
-        change: -303.60 + (Math.random() - 0.5) * 600,
-        change_pct: (sensexChange / 79842.15) * 100,
-      },
-      nse: {
-        value: (niftyChange / 24187.45) * 100,
-      },
-    });
+  // Function to fetch market data from database
+  const fetchMarketData = async () => {
+    try {
+      const response = await fetch('/api/market');
+      if (response.ok) {
+        const data = await response.json();
+        setMarketData({
+          date: data.date,
+          nifty50: {
+            value: data.nifty50_value,
+            change: data.nifty50_change,
+            change_pct: data.nifty50_change_pct,
+          },
+          sensex: {
+            value: data.sensex_value,
+            change: data.sensex_change,
+            change_pct: data.sensex_change_pct,
+          },
+          nse: {
+            value: data.nifty50_change_pct,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('[v0] Failed to fetch market data:', error);
+      // Fall back to mock data on error
+      setMarketData(MARKET_INDICES);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // Listen for agent completion and refresh market data
+  // Initial load and listen for agent completion
   useEffect(() => {
+    // Fetch data on mount
+    fetchMarketData();
+    setLoading(false);
+
     const unsubscribe = subscribeToAgentCompletion((success, message) => {
       if (success) {
         // Refresh market data after agent completes
-        refreshMarketData();
+        fetchMarketData();
       }
     });
 
     // Listen for page visibility to refresh data on focus
     const handleVisibilityChange = () => {
       if (!document.hidden) {
-        refreshMarketData();
+        fetchMarketData();
       }
     };
 
-    window.addEventListener('focus', refreshMarketData);
+    window.addEventListener('focus', fetchMarketData);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       unsubscribe();
-      window.removeEventListener('focus', refreshMarketData);
+      window.removeEventListener('focus', fetchMarketData);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, []);

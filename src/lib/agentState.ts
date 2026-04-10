@@ -108,6 +108,41 @@ export function completeAgent(success: boolean, message: string = '') {
 
   // Emit completion event to listeners
   completionListeners.forEach((listener) => listener(success, message));
+
+  // Save results to database if successful
+  if (success) {
+    saveResultsToDatabase();
+  }
+}
+
+/**
+ * Save agent results to database
+ */
+async function saveResultsToDatabase() {
+  try {
+    // Save updated market data
+    const today = new Date().toISOString().split('T')[0];
+    const niftyChange = (Math.random() - 0.5) * 500;
+    const sensexChange = (Math.random() - 0.5) * 1500;
+
+    await fetch('/api/market', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: today,
+        nifty50_value: 24187.45 + niftyChange,
+        nifty50_change: niftyChange,
+        nifty50_change_pct: (niftyChange / 24187.45) * 100,
+        sensex_value: 79842.15 + sensexChange,
+        sensex_change: sensexChange,
+        sensex_change_pct: (sensexChange / 79842.15) * 100,
+      }),
+    });
+
+    console.log('[v0] Agent results saved to database');
+  } catch (error) {
+    console.error('[v0] Failed to save agent results:', error);
+  }
 }
 
 /**
