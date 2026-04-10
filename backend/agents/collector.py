@@ -5,7 +5,7 @@ Scrapes NSE/BSE, Yahoo Finance, and financial news for FII/DII data.
 
 import logging
 from crewai import Agent, Task
-from crewai.tools import BaseTool
+from crewai_tools import BaseTool
 import requests
 from bs4 import BeautifulSoup
 import yfinance as yf

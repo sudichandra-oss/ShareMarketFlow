@@ -1,46 +1,33 @@
 """Insights API route"""
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
-from db.database import get_db
-from db.models import Insight
+from fastapi import APIRouter
+from datetime import date
 
 router = APIRouter()
 
+MOCK_INSIGHT = {
+    "report_date": str(date.today()),
+    "title": f"Smart Money Report — {date.today().strftime('%B %d, %Y')}",
+    "summary": "FIIs turned net buyers after 3 sessions of selling, pumping ₹2,847 Cr into Banking and Telecom. DIIs maintained aggressive accumulation in PSU and Infrastructure plays. Institutional breadth at 68% — historically bullish for Nifty50.",
+    "key_points": [
+        {"icon": "🏦", "text": "FIIs net bought ₹2,847 Cr — first positive session in 4 days, led by GIC and BlackRock in HDFC Bank and Reliance."},
+        {"icon": "📡", "text": "Telecom sector saw record FII inflow of ₹2,340 Cr. Bharti Airtel block deal worth ₹769 Cr signals 5G thesis builds."},
+        {"icon": "🏗️", "text": "Infrastructure top DII pick for 3rd consecutive week. LIC added 28 lakh shares of L&T at ₹3,412."},
+        {"icon": "💊", "text": "Pharma FII inflow ₹2,100 Cr — Sun Pharma, Dr. Reddy's benefiting from USD strength and US generic approvals."},
+        {"icon": "⚠️", "text": "IT sector saw FII outflow of ₹1,240 Cr. Q4 guidance concerns persist. TCS, Infosys near-term headwinds."},
+        {"icon": "🟢", "text": "Smart Money Score upgraded to 74/100 from 61 — strong buy signal per historical back-test patterns."},
+    ],
+    "smart_money_score": 74,
+    "sector_momentum": 67,
+    "institutional_confidence": 68,
+    "generated_by": "AI Agent Pipeline — CrewAI",
+}
+
+
 @router.get("/latest")
-async def get_latest_insight(db: AsyncSession = Depends(get_db)):
-    q = select(Insight).order_by(desc(Insight.report_date)).limit(1)
-    result = await db.execute(q)
-    insight = result.scalar_one_or_none()
-    
-    if not insight:
-        return {}
-        
-    return {
-        "report_date": str(insight.report_date),
-        "title": insight.title,
-        "summary": insight.summary,
-        "key_points": insight.key_points or [],
-        "smart_money_score": insight.smart_money_score,
-        "sector_momentum": insight.sector_momentum,
-        "institutional_confidence": insight.institutional_confidence,
-        "full_report": insight.full_report,
-        "generated_by": "AI Agent Pipeline — CrewAI"
-    }
+async def get_latest_insight():
+    return MOCK_INSIGHT
 
 
 @router.get("/history")
-async def get_insight_history(limit: int = 7, db: AsyncSession = Depends(get_db)):
-    q = select(Insight).order_by(desc(Insight.report_date)).limit(limit)
-    result = await db.execute(q)
-    insights = result.scalars().all()
-    
-    return [
-        {
-            "report_date": str(i.report_date),
-            "title": i.title,
-            "summary": i.summary,
-            "smart_money_score": i.smart_money_score,
-        }
-        for i in insights
-    ]
+async def get_insight_history(limit: int = 7):
+    return [MOCK_INSIGHT]  # In prod: query DB for past reports

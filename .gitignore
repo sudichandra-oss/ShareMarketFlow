@@ -1,15 +1,8 @@
 # ShareMarketFlow — Dependencies
-venv/
-test_venv/
-venv_new/
-*.db
-*.sqlite3
-.env
-.env.local
-.DS_Store
 node_modules/
 .next/
-local
+.env.local
+.env*.local
 dist/
 build/
 
@@ -37,4 +30,3 @@ npm-debug.log*
 *.sqlite
 *.db
 pgdata/
-venv/

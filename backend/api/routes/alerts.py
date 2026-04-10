@@ -1,53 +1,39 @@
 """Alerts API route"""
-from fastapi import APIRouter, Depends
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, update
-from db.database import get_db
-from db.models import Alert
+from fastapi import APIRouter, Body
 from typing import Optional
 
 router = APIRouter()
 
+_alerts = [
+    {"id": 1, "type": "LARGE_DEAL", "severity": "HIGH", "institution": "GIC Private Limited", "company": "HDFC Bank", "value_cr": 2616, "description": "GIC bought 1.42 Cr shares of HDFC Bank worth ₹2,616 Cr in bulk deal", "time": "15:58", "is_read": False},
+    {"id": 2, "type": "STAKE_CHANGE", "severity": "HIGH", "institution": "BlackRock Inc.", "company": "Reliance Industries", "value_cr": 1117, "description": "BlackRock increased stake from 1.2% to 1.8% — ₹1,117 Cr block deal", "time": "15:45", "is_read": False},
+    {"id": 3, "type": "SECTOR_FLOW", "severity": "MEDIUM", "institution": "Multiple FIIs", "company": "Telecom Sector", "value_cr": 2340, "description": "Telecom sector FII inflow crossed ₹2,340 Cr — highest in 6 months", "time": "15:30", "is_read": False},
+    {"id": 4, "type": "LARGE_DEAL", "severity": "HIGH", "institution": "LIC", "company": "Larsen & Toubro", "value_cr": 955, "description": "LIC bought 28L shares of L&T worth ₹955 Cr — sustained accumulation", "time": "14:22", "is_read": True},
+    {"id": 5, "type": "NEW_ENTRY", "severity": "MEDIUM", "institution": "Norges Bank", "company": "Infosys Ltd", "value_cr": 877, "description": "Norges Bank new entry in Infosys — 54L shares at ₹1,624", "time": "13:10", "is_read": True},
+]
+
+
 @router.get("")
-async def get_alerts(severity: Optional[str] = None, is_read: Optional[bool] = None, db: AsyncSession = Depends(get_db)):
-    q = select(Alert).order_by(desc(Alert.triggered_at)).limit(50)
+async def get_alerts(severity: Optional[str] = None, is_read: Optional[bool] = None):
+    result = _alerts
     if severity:
-        q = q.where(Alert.severity == severity.upper())
+        result = [a for a in result if a["severity"] == severity.upper()]
     if is_read is not None:
-        q = q.where(Alert.is_read == is_read)
-        
-    result = await db.execute(q)
-    alerts = result.scalars().all()
-    
-    return [
-        {
-            "id": a.id,
-            "type": a.alert_type,
-            "severity": a.severity,
-            "institution": a.institution_name,
-            "company": a.company_name,
-            "value_cr": float(a.value_cr or 0),
-            "description": a.description,
-            "time": a.triggered_at.strftime("%H:%M") if a.triggered_at else "",
-            "is_read": a.is_read
-        }
-        for a in alerts
-    ]
+        result = [a for a in result if a["is_read"] == is_read]
+    return result
 
 
 @router.patch("/{alert_id}/read")
-async def mark_read(alert_id: int, db: AsyncSession = Depends(get_db)):
-    q = update(Alert).where(Alert.id == alert_id).values(is_read=True)
-    result = await db.execute(q)
-    await db.commit()
-    if result.rowcount > 0:
-        return {"status": "ok"}
+async def mark_read(alert_id: int):
+    for a in _alerts:
+        if a["id"] == alert_id:
+            a["is_read"] = True
+            return {"status": "ok"}
     return {"status": "not_found"}
 
 
 @router.patch("/mark-all-read")
-async def mark_all_read(db: AsyncSession = Depends(get_db)):
-    q = update(Alert).where(Alert.is_read == False).values(is_read=True)
-    result = await db.execute(q)
-    await db.commit()
-    return {"status": "ok", "count": result.rowcount}
+async def mark_all_read():
+    for a in _alerts:
+        a["is_read"] = True
+    return {"status": "ok", "count": len(_alerts)}

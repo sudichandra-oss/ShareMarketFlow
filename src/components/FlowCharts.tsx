@@ -4,7 +4,7 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend,
 } from 'recharts';
-import { Flow } from '@/lib/api';
+import { MOCK_FLOWS } from '@/lib/mockData';
 
 const formatCr = (v: number) => `₹${Math.abs(v / 1000).toFixed(1)}K Cr`;
 
@@ -25,9 +25,8 @@ function CustomTooltip({ active, payload, label }: any) {
   );
 }
 
-export function FIIDIIFlowChart({ flows }: { flows: Flow[] }) {
-  if (!flows || flows.length === 0) return <div>No flow data</div>;
-  const data = flows.slice(-14).map(d => ({
+export function FIIDIIFlowChart() {
+  const data = MOCK_FLOWS.slice(-14).map(d => ({
     date: d.date.slice(5),
     'FII Net': Math.round(d.fii_net),
     'DII Net': Math.round(d.dii_net),
@@ -64,10 +63,9 @@ export function FIIDIIFlowChart({ flows }: { flows: Flow[] }) {
   );
 }
 
-export function CumulativeFlowChart({ flows }: { flows: Flow[] }) {
-  if (!flows || flows.length === 0) return <div>No flow data</div>;
+export function CumulativeFlowChart() {
   let fiiCum = 0, diiCum = 0;
-  const data = flows.map(d => {
+  const data = MOCK_FLOWS.map(d => {
     fiiCum += d.fii_net;
     diiCum += d.dii_net;
     return {
